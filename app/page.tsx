@@ -1,11 +1,15 @@
-import React from "react";
+import { Hero } from "@/components/homepage/Hero";
+import { Navbar } from "@/components/layout/Navbar";
+
 
 function Home() {
   return (
-    <div>
-      <h1>JobPilot</h1>
-      <p>Your ultimate job hunting assistant</p>
-    </div>
+    <>
+      <Navbar />
+      <main className="pb-0">
+       <Hero/>
+      </main>
+    </>
   );
 }
 
