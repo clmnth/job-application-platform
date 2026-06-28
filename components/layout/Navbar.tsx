@@ -11,57 +11,42 @@ const NAV_ITEMS = [
   },
   {
     href: "/find-jobs",
-    label: "Find Jobs"
+    label: "Find Jobs",
   },
   {
     href: "/profile",
-    label: "Profile"
-  }
-]
+    label: "Profile",
+  },
+];
 
 export function Navbar() {
-   const pathname = usePathname();
+  const pathname = usePathname();
   return (
-
-   
-    // <nav className="bg-white shadow">
-    //   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    //     <div className="flex justify-between h-16">
-    //       <div className="flex">
-    //         <div className="flex-shrink-0 flex items-center">
-    //           <h1 className="text-xl font-bold text-gray-900">JobPilot</h1>
-    //         </div>
-    //       </div>
-    //     </div>
-    //   </div>
-    // </nav>
     <header className="border-b border-border bg-surface">
       <div className="mx-auto flex h-16 max-w-360 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Logo priority />
         <nav className="hidden items-center gap-8 md:flex">
           {NAV_ITEMS.map((item) => {
-            const isActive = item.href === "/find-jobs"
-            ? pathname.startsWith("/find-jobs")
-            : pathname === item.href;
+            const isActive =
+              item.href === "/find-jobs"
+                ? pathname.startsWith("/find-jobs")
+                : pathname === item.href;
 
-            return(
+            return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={[
                   "text-sm font-medium transition-colors",
                   isActive
-                  ? "text-accent"
-                  : "text-text-dark hover:text-text-primary"
+                    ? "text-accent"
+                    : "text-text-dark hover:text-text-primary",
                 ].join(" ")}
               >
                 {item.label}
               </Link>
-            )
-            
+            );
           })}
-            
-
         </nav>
         {/* TODO: isAuthenticated layout */}
       </div>
