@@ -26,10 +26,11 @@ type AuthContextValue = {
     email: string,
     password: string,
     name: string,
-  ) => Promise<void>;
+  ) => Promise<{ requireEmailVerification: boolean }>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  verifyEmail: (email: string, otp: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -101,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUpWithPassword = useCallback(
     async (email: string, password: string, name: string) => {
-      const { error } = await insforge.auth.signUp({
+      const { data, error } = await insforge.auth.signUp({
         email,
         password,
         name,
@@ -111,6 +112,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           error.message ?? "Unable to create your account right now.",
         );
       }
+
+      // Check if the backend is asking for verification
+      const requireEmailVerification = !!data?.requireEmailVerification;
+
+      // Only refresh the user session if they are actually logged in
+      if (!requireEmailVerification) {
+        await refreshUser();
+      }
+
+      // Return this flag so the UI (AuthPanel) can decide wether to show the modal
+      return { requireEmailVerification };
+    },
+    [insforge, refreshUser],
+  );
+
+  // TODO: verifyEmail function
+  const verifyEmail = useCallback(
+    async (email: string, otp: string) => {
+      // 1. Call the SDK with the email and the otp
+      const { error } = await insforge.auth.verifyEmail({ email, otp });
+
+      if (error) {
+        throw new Error(
+          error.message ?? "Unable to verify your email right now",
+        );
+      }
+
+      // 2. If successful, the user is now logged in! Refresh the session.
       await refreshUser();
     },
     [insforge, refreshUser],
@@ -149,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signOut,
       refreshUser,
+      verifyEmail,
     }),
     [
       authProviders,
@@ -159,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       signUpWithPassword,
       user,
+      verifyEmail,
     ],
   );
 
