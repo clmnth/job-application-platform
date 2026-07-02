@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Mail, ShieldCheck } from "lucide-react";
 
+// TODO: Instead of immediately redirecting to /dashboard after sign-up we must check if verification is required.
+// If verification is required, we will hide the sign-up form and show the VerificationModal component
+
 export function AuthPanel() {
   const router = useRouter();
   const {
@@ -14,11 +17,13 @@ export function AuthPanel() {
     signInWithPassword,
     signUpWithPassword,
     signInWithGoogle,
+    verifyEmail,
   } = useAuth();
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+  const [mode, setMode] = useState<"sign-in" | "sign-up" | "verify">("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,14 +34,42 @@ export function AuthPanel() {
 
     try {
       if (mode === "sign-up") {
-        await signUpWithPassword(email, password, name);
+        const { requireEmailVerification } = await signUpWithPassword(
+          email,
+          password,
+          name,
+        );
+
+        if (requireEmailVerification) {
+          setMode("verify"); // Switch the UI
+          setIsSubmitting(false);
+
+          return;
+        }
       } else {
         await signInWithPassword(email, password);
       }
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed.");
-    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // HandleVerify
+  const HandleVerify = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      // Use the email user already provided during sign up, plus the otp code
+      await verifyEmail(email, otp);
+
+      // If verification is successful, redirect the user to the dashboard
+      router.push("/dashboard");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Veriifcation failed");
       setIsSubmitting(false);
     }
   };
@@ -110,106 +143,151 @@ export function AuthPanel() {
         </div>
 
         <div className="flex flex-col justify-center p-8 sm:p-10">
-          <div>
-            <p className="text-sm font-medium text-text-secondary">
-              Welcome to
-            </p>
-            <h2 className="mt-2 text-3xl font-semibold leading-9 text-text-primary">
-              JobPilot
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-text-secondary">
-              {mode === "sign-in"
-                ? "Sign in to your account to continue."
-                : "Create a new account to get started."}
-            </p>
-          </div>
+          {mode === "verify" ? (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div>
+                <p className="text-sm font-medium text-text-secondary">
+                  Check your email
+                </p>
+                <h2 className="mt-2 text-3xl font-semibold leading-9 text-text-primary">
+                  Verify your account
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-text-secondary">
+                  We&apos;ve sent a code to {email}. Enter it below to verify
+                  your account.
+                </p>
+              </div>
 
-          {error ? (
-            <div className="mt-6 rounded-md border border-error bg-error/10 px-4 py-3 text-sm font-medium text-error">
-              {error}
+              {error ? (
+                <div className="mt-6 rounded-md border border-error bg-error/10 px-4 py-3 text-sm font-medium text-error">
+                  {error}
+                </div>
+              ) : null}
+
+              <form className="mt-8 space-y-4" onSubmit={HandleVerify}>
+                <label className="block text-sm font-medium text-text-primary">
+                  <span className="mb-1 block">Verification Code</span>
+                  <input
+                    type="text"
+                    value={otp}
+                    onChange={(event) => setOtp(event.target.value)}
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                    placeholder="123456"
+                    required
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmitting ? "Verifying..." : "Verify"}
+                </button>
+              </form>
             </div>
-          ) : null}
+          ) : (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div>
+                <p className="text-sm font-medium text-text-secondary">
+                  Welcome to
+                </p>
+                <h2 className="mt-2 text-3xl font-semibold leading-9 text-text-primary">
+                  JobPilot
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-text-secondary">
+                  {mode === "sign-in"
+                    ? "Sign in to your account to continue."
+                    : "Create a new account to get started."}
+                </p>
+              </div>
 
-          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
-            {mode === "sign-up" ? (
-              <label className="block text-sm font-medium text-text-primary">
-                <span className="mb-1 block">Full name</span>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                  placeholder="Alex Morgan"
-                />
-              </label>
-            ) : null}
+              {error ? (
+                <div className="mt-6 rounded-md border border-error bg-error/10 px-4 py-3 text-sm font-medium text-error">
+                  {error}
+                </div>
+              ) : null}
 
-            <label className="block text-sm font-medium text-text-primary">
-              <span className="mb-1 block">Email</span>
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-              />
-            </label>
+              <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+                {mode === "sign-up" ? (
+                  <label className="block text-sm font-medium text-text-primary">
+                    <span className="mb-1 block">Full name</span>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                      placeholder="Alex Morgan"
+                    />
+                  </label>
+                ) : null}
 
-            <label className="block text-sm font-medium text-text-primary">
-              <span className="mb-1 block">Password</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                placeholder="Minimum 8 characters"
-                required
-                autoComplete={
-                  mode === "sign-up" ? "new-password" : "current-password"
-                }
-              />
-            </label>
+                <label className="block text-sm font-medium text-text-primary">
+                  <span className="mb-1 block">Email</span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                    placeholder="you@example.com"
+                    required
+                    autoComplete="email"
+                  />
+                </label>
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {isSubmitting
-                ? "Please wait…"
-                : mode === "sign-up"
-                  ? "Create account"
-                  : "Sign in"}
-            </button>
-          </form>
+                <label className="block text-sm font-medium text-text-primary">
+                  <span className="mb-1 block">Password</span>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                    placeholder="Minimum 8 characters"
+                    required
+                    autoComplete={
+                      mode === "sign-up" ? "new-password" : "current-password"
+                    }
+                  />
+                </label>
 
-          {authProviders.email ? (
-            <button
-              type="button"
-              onClick={() =>
-                setMode(mode === "sign-in" ? "sign-up" : "sign-in")
-              }
-              className="mt-4 text-sm font-medium text-accent hover:text-accent-dark"
-            >
-              {mode === "sign-in"
-                ? "Need an account? Create one"
-                : "Already have an account? Sign in"}
-            </button>
-          ) : null}
-
-          <div className="mt-6 border-t border-border pt-6">
-            <button
-              type="button"
-              onClick={handleGoogle}
-              disabled={isSubmitting}
-              className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <Mail aria-hidden className="h-5 w-5 text-accent" />
-              Continue with Google
-            </button>
-          </div>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmitting
+                    ? "Please wait…"
+                    : mode === "sign-up"
+                      ? "Create account"
+                      : "Sign in"}
+                </button>
+              </form>
+              {authProviders.email ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMode(mode === "sign-in" ? "sign-up" : "sign-in")
+                  }
+                  className="mt-4 text-sm font-medium text-accent hover:text-accent-dark"
+                >
+                  {mode === "sign-in"
+                    ? "Need an account? Create one"
+                    : "Already have an account? Sign in"}
+                </button>
+              ) : null}
+              <div className="mt-6 border-t border-border pt-6">
+                <button
+                  type="button"
+                  onClick={handleGoogle}
+                  disabled={isSubmitting}
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <Mail aria-hidden className="h-5 w-5 text-accent" />
+                  Continue with Google
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
